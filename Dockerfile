@@ -68,5 +68,4 @@ USER nextjs
 EXPOSE 3000
 
 ENV PORT 3000
-
-CMD node apps/${SCOPE}/server.js
+CMD node apps/${SCOPE}/dist/main.js
