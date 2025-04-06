@@ -69,6 +69,7 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "."]
+CMD ["node", "apps/dashboard/.next/standalone/server.js"]
+
 
 
