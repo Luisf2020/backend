@@ -51,25 +51,24 @@ ARG NEXT_PUBLIC_MERCADOLIBRE_CLIENT_ID
 # Build del dashboard
 RUN NODE_OPTIONS="--max_old_space_size=4096" pnpm turbo run build --filter=${SCOPE}...
 
-# Etapa runner para producción
-FROM node:18-alpine AS runner
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
 ENV PORT 3000
 
-RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Copiamos el resultado del build
-COPY --from=builder /app/apps/${SCOPE}/public ./apps/${SCOPE}/public
+COPY --from=builder /app/apps/${SCOPE}/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/${SCOPE}/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/${SCOPE}/.next/static ./apps/${SCOPE}/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/${SCOPE}/.next/static ./static
 
 USER nextjs
 
 EXPOSE 3000
 
-# El archivo correcto para Next.js standalone es `server.js`
 CMD ["node", "server.js"]
+
 
