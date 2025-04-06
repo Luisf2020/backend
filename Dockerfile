@@ -1,35 +1,35 @@
+# Etapa base con configuración mínima para pnpm y turbo
 FROM node:18-alpine AS base
-ARG SCOPE
+
+ARG SCOPE=dashboard
 ENV SCOPE=${SCOPE}
 
-RUN apk add --no-cache openssl
-RUN npm --global install pnpm@8.7.5
+RUN apk add --no-cache openssl python3 make g++ \
+    && npm install -g pnpm@8.7.5 turbo
 
-FROM base AS pruner
-RUN npm --global install turbo
 WORKDIR /app
 COPY . .
+
+# Prune para reducir el contexto a lo necesario
 RUN turbo prune --scope=${SCOPE} --docker
 
-# Rebuild the source code only when needed
+# Etapa de build
 FROM base AS builder
 WORKDIR /app
-COPY .gitignore .gitignore
-COPY .npmrc ./
-COPY --from=pruner /app/out/json/ .
-COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 
+COPY --from=base /app/out/json/ ./
+COPY --from=base /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+
+# Instalación de dependencias necesarias
 RUN pnpm install
 
-RUN rm -rf node_modules/.pnpm/canvas@2.11.2
-
-COPY --from=pruner /app/out/full/ .
+# Copiamos los archivos necesarios
+COPY --from=base /app/out/full/ ./
 COPY turbo.json turbo.json
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Variables necesarias para la build en caso de que uses Vercel o similares
 ARG NEXT_PUBLIC_S3_BUCKET_NAME
 ARG NEXT_PUBLIC_AWS_ENDPOINT
 ARG NEXT_PUBLIC_DASHBOARD_URL
@@ -47,25 +47,29 @@ ARG NEXT_PUBLIC_MIXPANEL_TOKEN
 ARG NEXT_PUBLIC_FACEBOOK_PIXEL_ID
 ARG NEXT_PUBLIC_MERCADOLIBRE_BASE_URL
 ARG NEXT_PUBLIC_MERCADOLIBRE_CLIENT_ID
+
+# Build del dashboard
 RUN NODE_OPTIONS="--max_old_space_size=4096" pnpm turbo run build --filter=${SCOPE}...
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Etapa runner para producción
+FROM node:18-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
+ENV PORT 3000
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
 
+# Copiamos el resultado del build
 COPY --from=builder /app/apps/${SCOPE}/public ./apps/${SCOPE}/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/${SCOPE}/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/${SCOPE}/.next/static ./apps/${SCOPE}/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/${SCOPE}/.next/server ./apps/${SCOPE}/.next/server
 
 USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-CMD node apps/${SCOPE}/dist/main.js
+# El archivo correcto para Next.js standalone es `server.js`
+CMD ["node", "server.js"]
+
