@@ -9,7 +9,7 @@
     "dev:all:test": "NODE_ENV=test APP_ENV=test concurrently \"pnpm dev -p 3042\" \"pnpm worker:datasource-loader\"",
     "build": "pnpm --filter=prisma exec prisma generate && next build",
     "tunnel": "npm run dotenv -- pnpx localtunnel -- --port 3000 --subdomain $USER-chaindesk",
-    "start": ""node server.js",
+    "start": "node server.js",
     "typecheck": "npm run dotenv -- tsc --noemit",
     "lint": "npm run dotenv -- next lint --fix",
     "e2e:api": "jest __tests__/api",
